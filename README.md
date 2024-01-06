@@ -1,5 +1,6 @@
 
 # TestNodeApp
+![image](https://github.com/zdbrig/secure-run/assets/934740/55970c04-5594-4350-9e6b-8b4090863082)
 
 This is a simple Node.js application that demonstrates how to securely manage environment variables for development purposes.
 
