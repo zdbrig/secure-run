@@ -47,11 +47,11 @@ while true; do
 done
 
 # Defining the file names
-ENV_FILE="envorigin"
-ENCRYPTED_FILE=".env.enc"
+ENV_FILE=".env"
+ENCRYPTED_FILE=".env.production.enc"
 
 # Encrypt the .env file
-openssl enc -aes-256-cbc -salt -in "$ENV_FILE" -out "$ENCRYPTED_FILE" -pass pass:"$ENCRYPTION_PASSWORD"
+openssl enc -aes-256-cbc -salt -md md5 -in "$ENV_FILE" -out "$ENCRYPTED_FILE" -pass pass:"$ENCRYPTION_PASSWORD"
 
 # Check if the .env file was encrypted successfully
 if [ -f "$ENCRYPTED_FILE" ]; then
