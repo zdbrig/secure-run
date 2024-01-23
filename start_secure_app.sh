@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to decrypt the appropriate .env file based on NODE_ENV, set environment variables in memory, and run the TypeScript Node.js app
+# Script to decrypt individual values in .env, set environment variables in memory, and run the TypeScript Node.js app
 
 # Check if OpenSSL is installed
 if ! command -v openssl &> /dev/null
@@ -9,31 +9,35 @@ then
     exit 1
 fi
 
-# Define the file names based on NODE_ENV
-ENCRYPTED_FILE=".env.enc"
-
+# Define the .env file name
+ENV_FILE="envorigin"
+ENCRYPTED_PREFIX="encrypted_"
 
 # Prompt for the decryption password
 read -sp 'Enter the decryption password: ' DECRYPTION_PASSWORD
 echo
 
-# Decrypt the .env file content directly into a variable
-DECRYPTED_CONTENT=$(openssl enc -d -aes-256-cbc -md md5 -in "$ENCRYPTED_FILE" -pass pass:"$DECRYPTION_PASSWORD" 2>/dev/null)
+# Decrypt only the encrypted values in the .env file and set them as environment variables
+while IFS= read -r line || [[ -n "$line" ]]; do
+    key="${line%%=*}"
+    value="${line#*=}"
 
-# Check if the decryption was successful
-if [ -z "$DECRYPTED_CONTENT" ]; then
-    echo "Failed to decrypt the $ENCRYPTED_FILE. Check your password and try again."
-    exit 1
-fi
+    if [[ "$value" == "$ENCRYPTED_PREFIX"* ]]; then
+        encrypted_value="${value#$ENCRYPTED_PREFIX}"
+        decrypted_value=$(echo -n "$encrypted_value" | base64 -d | openssl enc -aes-256-cbc -d -salt -md md5 -pass pass:"$DECRYPTION_PASSWORD" 2>/dev/null)
+      #  decrypted_value=$(openssl enc -aes-256-cbc -d -in "$encrypted_value" -salt -md md5 -pass pass:"$DECRYPTION_PASSWORD" 2>&1)
 
-# Export the variables in the decrypted content
-while IFS='=' read -r key value
-do
-  # Remove any existing quotes and export the variable
-  value="${value%\"}"
-  value="${value#\"}"
-  export "$key=$value"
-done <<< "$DECRYPTED_CONTENT"
+        if [ $? -eq 0 ]; then
+           
+            export "$key=$decrypted_value"
+        else
+            echo "Failed to decrypt the value for '$key'. Check your password and try again."
+            exit 1
+        fi
+    else
+        export "$key=$value"
+    fi
+done < "$ENV_FILE"
 
 # Run the TypeScript Node.js application
-node index.ts
+docker compose up
