@@ -1,6 +1,7 @@
+
 #!/bin/bash
 
-# Script to encrypt the .env file with password confirmation and complexity check
+# Script to selectively encrypt values in a .env file
 
 # Check if OpenSSL is installed
 if ! command -v openssl &> /dev/null
@@ -47,16 +48,26 @@ while true; do
 done
 
 # Defining the file names
-ENV_FILE=".env"
-ENCRYPTED_FILE=".env.production.enc"
+ENV_FILE="envorigin"
+TEMP_FILE=".env.tmp"
+ENCRYPTED_PREFIX="encrypted_"
 
-# Encrypt the .env file
-openssl enc -aes-256-cbc -salt -md md5 -in "$ENV_FILE" -out "$ENCRYPTED_FILE" -pass pass:"$ENCRYPTION_PASSWORD"
+# Encrypt only the values in the .env file
+while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == *"$ENCRYPTED_PREFIX"* ]]; then
+        echo "$line" >> "$TEMP_FILE"
+    elif [[ "$line" == *"="* ]]; then
+        key="${line%%=*}"
+        value="${line#*=}"
+        # Using printf to avoid issues with echo and command-line flags
+        encrypted_value=$(printf "%s" "$value" | openssl enc -aes-256-cbc -salt -md md5 -pass pass:"$ENCRYPTION_PASSWORD" | base64)
+        echo "${key}=${ENCRYPTED_PREFIX}${encrypted_value}" >> "$TEMP_FILE"
+    else
+        echo "$line" >> "$TEMP_FILE"
+    fi
+done < "$ENV_FILE"
 
-# Check if the .env file was encrypted successfully
-if [ -f "$ENCRYPTED_FILE" ]; then
-    echo "Your .env file has been encrypted to $ENCRYPTED_FILE"
-else
-    echo "Failed to encrypt the .env file."
-    exit 1
-fi
+# Replace original file with encrypted file
+mv "$TEMP_FILE" "$ENV_FILE"
+
+echo "Your .env file has been updated with encrypted values."
